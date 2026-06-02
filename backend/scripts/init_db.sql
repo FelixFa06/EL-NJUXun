@@ -1,3 +1,4 @@
+DROP DATABASE IF EXISTS njuxun;
 -- ============================================
 -- NJUXun（南大图寻）数据库初始化脚本
 -- 用途：创建数据库和三张核心表
@@ -40,9 +41,8 @@ CREATE TABLE users (
     -- 累计总分，默认 0
     total_score INT DEFAULT 0,
 
-    -- 玩过的游戏次数，默认 0
+    -- 玩过Functions的游戏次数，默认 0
     games_played INT DEFAULT 0,
-
     -- created_at: 记录创建时间
     -- DEFAULT CURRENT_TIMESTAMP: 如果插入时不填，自动取当前时间
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -51,7 +51,7 @@ CREATE TABLE users (
 -- ============================================
 -- 步骤3：创建 locations 表（地点/题目表）
 -- ============================================
--- 注意：✅ 使用 px_x, px_y（像素坐标）替代经纬度
+-- 注意：✅ 使用 px_x, px_y（像素坐标）替代经纬度users
 -- px_x = 像素横坐标（从左到右，0~7087）
 -- px_y = 像素纵坐标（从上到下，0~10630）
 CREATE TABLE locations (
