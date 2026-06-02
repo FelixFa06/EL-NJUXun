@@ -230,6 +230,9 @@ build/
 .env.local
 .env.*.local
 
+# Claude Code
+.claude/settings.local.json
+
 # IDE / Editor
 .vscode/
 .idea/

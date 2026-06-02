@@ -12,6 +12,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **后端**: Node.js + Express 4 + MySQL (mysql2) + JWT 认证
 - **无 TypeScript**，全部使用纯 JavaScript
 
+### 依赖注册状态
+
+`frontend/src/main.js` 当前只注册了 `router`。以下依赖的实际状态：
+
+- **Vue Router** ✅ 已注册（`app.use(router)`）
+- **Pinia** ❌ 仅安装，未 `createPinia()` / `app.use(pinia)`，stores 目录为空
+- **Element Plus** ❌ 仅安装，未 `import` 样式 / `app.use(ElementPlus)`
+
+在组件中使用 `<el-button>` 等 Element Plus 组件或 `useStore()` 之前，需先在 `main.js` 中完成对应注册。
+
 ## 常用命令
 
 ```bash
@@ -26,7 +36,12 @@ cd backend && npm run dev
 
 # 后端生产启动
 cd backend && npm start
+
+# 数据库初始化（首次使用）
+mysql -u root -p < backend/scripts/init_db.sql
 ```
+
+> **注意**：`.env` 被 `.gitignore` 忽略，首次使用需 `cp .env.example .env` 并填写实际数据库密码和 JWT 密钥。后端启动依赖 `.env` 中的数据库连接信息。
 
 ## 项目架构
 
@@ -38,6 +53,16 @@ cd backend && npm start
 ```
 
 所有路由通过 `vue-router` 懒加载（`() => import(...)`），定义在 `frontend/src/router/index.js`。
+
+### 各页面当前状态
+
+| 页面 | 状态 | 说明 |
+|------|------|------|
+| HomeView | 骨架 | 标题 + "开始探索"按钮（`<router-link>` 到 `/game`） |
+| GameView | 基础可用 | 地图点击 → 坐标捕获 → 蓝色标记显示 → `submitGuess()` 弹出 alert；照片区域为占位文字 |
+| ResultView | 占位 | 仅标题和一句描述文字 |
+
+GameView 的核心交互流程已通：`CampusMap` 的 `@mapClick` → `onMapClick(pos)` 存储坐标 → computed `markers` 生成蓝色猜测标记 → 点击"提交答案"调用 `submitGuess()`（当前仅 `alert`，待接入后端 API）。
 
 ### 地图组件坐标系统
 
@@ -65,7 +90,20 @@ cd backend && npm start
 
 ### 数据库
 
-使用 MySQL，通过 `.env` 配置连接信息。数据库名为 `el_njuxun`。参考 `.env.example` 创建 `.env` 文件。
+使用 MySQL，数据库名 `njuxun`。初始化脚本：`backend/scripts/init_db.sql`。通过 `.env` 配置连接信息，参考 `.env.example` 创建 `.env`。
+
+三张核心表结构：
+
+**users** — 用户表
+`id`(PK, AUTO_INCREMENT), `username`(VARCHAR(100), UNIQUE, NOT NULL), `email`(VARCHAR(255), UNIQUE, NOT NULL), `password`(VARCHAR(255), NOT NULL), `total_score`(INT, DEFAULT 0), `games_played`(INT, DEFAULT 0), `created_at`(DATETIME, DEFAULT CURRENT_TIMESTAMP)
+
+**locations** — 地点/题目表
+`id`(PK, AUTO_INCREMENT), `name`(VARCHAR(100), NOT NULL), `description`(TEXT), `px_x`(INT, NOT NULL), `px_y`(INT, NOT NULL), `image_url`(VARCHAR(255), NOT NULL), `difficulty`(TINYINT, DEFAULT 3), `area`(VARCHAR(50)), `created_at`(DATETIME, DEFAULT CURRENT_TIMESTAMP)
+
+**game_records** — 游戏记录表
+`id`(PK, AUTO_INCREMENT), `user_id`(INT, NOT NULL, FK→users.id ON DELETE CASCADE), `location_id`(INT, NOT NULL, FK→locations.id ON DELETE RESTRICT), `guess_px_x`(INT, NOT NULL), `guess_px_y`(INT, NOT NULL), `distance_meters`(DECIMAL(10,2), NOT NULL), `score`(INT, NOT NULL), `created_at`(DATETIME, DEFAULT CURRENT_TIMESTAMP)
+
+> 坐标字段（`px_x`, `px_y`, `guess_px_x`, `guess_px_y`）均为原始图片像素坐标，基准尺寸 7087×10630。非经纬度。
 
 ### 状态管理
 
