@@ -66,12 +66,17 @@ const hasClicked = ref(false)
 const currentLocation = ref(null)
 const currentPhoto = ref('')
 
-// 从假数据中随机选一个
-function fetchRandomLocation() {
-  const randomIndex = Math.floor(Math.random() * mockLocations.length)
-  currentLocation.value = mockLocations[randomIndex]
-  currentPhoto.value = mockLocations[randomIndex].image_url
-  console.log('当前地点：', currentLocation.value.name)
+// 从后端获取随机地点
+async function fetchRandomLocation() {
+  try {
+    const res = await fetch('http://localhost:3000/api/locations/random')
+    const data = await res.json()
+    currentLocation.value = data
+    currentPhoto.value = 'http://localhost:3000' + data.image_url
+    console.log('当前地点ID：', data.id)
+  } catch (err) {
+    console.error('获取地点失败：', err)
+  }
 }
 
 const markers = computed(() => {
