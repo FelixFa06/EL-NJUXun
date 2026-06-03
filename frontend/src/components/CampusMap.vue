@@ -29,9 +29,9 @@
 import { ref, onMounted } from 'vue'
 
 const props = defineProps({
-  mapImage: { type: String, default: '/src/assets/gulou_map.png' },
-  mapWidth: { type: Number, default: 7087 },
-  mapHeight: { type: Number, default: 10630 },
+  mapImage: { type: String, default: '/gulou_map.png' },
+  mapWidth: { type: Number, default: 2546 },
+  mapHeight: { type: Number, default: 3914 },
   width: { type: Number, default: 600 },
   height: { type: Number, default: 450 },
   markers: { type: Array, default: () => [] },
