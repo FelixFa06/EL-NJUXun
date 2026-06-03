@@ -11,7 +11,8 @@
         />
       </div>
       <div class="photo-area">
-        <p>照片区域（待接入）</p>
+        <img :src="currentPhoto" alt="校园照片" v-if="currentPhoto" />
+        <p v-else>加载中...</p>
       </div>
     </div>
     <div class="info-panel" v-if="hasClicked">
@@ -25,11 +26,53 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import CampusMap from '../components/CampusMap.vue'
+
+// ------------------- 假数据（等后端好了就删掉这部分）--------------------
+const mockLocations = [
+  {
+    id: 1,
+    name: "北大楼",
+    image_url: "/e6.jpg",
+    difficulty: 2,
+    area: "北园",
+    px_x: 1200,
+    px_y: 800
+  },
+  {
+    id: 2,
+    name: "图书馆",
+    image_url: "/e6.jpg",
+    difficulty: 3,
+    area: "北园",
+    px_x: 1400,
+    px_y: 900
+  },
+  {
+    id: 3,
+    name: "大礼堂",
+    image_url: "/e6.jpg",
+    difficulty: 3,
+    area: "北园",
+    px_x: 1100,
+    px_y: 750
+  }
+]
+// ------------------- 假数据结束 --------------------
 
 const clickPos = ref({ x: 0, y: 0 })
 const hasClicked = ref(false)
+const currentLocation = ref(null)
+const currentPhoto = ref('')
+
+// 从假数据中随机选一个
+function fetchRandomLocation() {
+  const randomIndex = Math.floor(Math.random() * mockLocations.length)
+  currentLocation.value = mockLocations[randomIndex]
+  currentPhoto.value = mockLocations[randomIndex].image_url
+  console.log('当前地点：', currentLocation.value.name)
+}
 
 const markers = computed(() => {
   if (!hasClicked.value) return []
@@ -37,14 +80,19 @@ const markers = computed(() => {
 })
 
 function onMapClick(pos) {
-  console.log('点击坐标：', pos)
   clickPos.value = { x: pos.x, y: pos.y }
   hasClicked.value = true
 }
 
 function submitGuess() {
-  alert('提交坐标：' + clickPos.value.x + ', ' + clickPos.value.y)
+  alert('提交坐标：(' + clickPos.value.x + ', ' + clickPos.value.y + ')' +
+      '\n真实坐标：(' + currentLocation.value.px_x + ', ' + currentLocation.value.px_y + ')')
 }
+
+// 页面加载时自动获取一个地点
+onMounted(() => {
+  fetchRandomLocation()
+})
 </script>
 
 <style scoped>
@@ -57,19 +105,26 @@ function submitGuess() {
 .game-layout {
   display: flex;
   gap: 16px;
-}
-.map-area {
-  width: 400px;
   height: 600px;
 }
 .photo-area {
-  width: 400px;
-  height: 450px;
+  flex: 6;
   background: #f0f0f0;
   border-radius: 12px;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.photo-area img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;    /* 改为 contain，保持照片完整显示 */
+  background: #e0e0e0;    /* 留白区域的背景色 */
+}
+.map-area {
+  flex: 2;
+  height: 600px;
 }
 .info-panel {
   padding: 12px 20px;
@@ -91,4 +146,19 @@ button {
 button:hover {
   background: #1547b8;
 }
+@media (max-width: 768px) {
+  .game-layout {
+    flex-direction: column;
+    height: auto;
+  }
+  .map-area {
+    width: 100%;
+    height: 400px;
+  }
+  .photo-area {
+    width: 100%;
+    height: 250px;
+  }
+}
+
 </style>
