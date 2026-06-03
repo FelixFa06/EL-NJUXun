@@ -89,6 +89,7 @@ CREATE TABLE locations (
 CREATE TABLE game_records (
     id INT PRIMARY KEY AUTO_INCREMENT,
 
+
     -- 外键：引用 users.id，记录是哪个用户玩的
     user_id INT NOT NULL,
 
