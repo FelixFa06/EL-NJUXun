@@ -104,13 +104,13 @@ async function fetchRandomLocation() {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 3000)
     const url = exclude
-      ? `http://10.6.18.198:3001/api/locations/random?exclude=${exclude}`
-      : 'http://10.6.18.198:3001/api/locations/random'
+      ? `/api/locations/random?exclude=${exclude}`
+      : '/api/locations/random'
     const res = await fetch(url, { signal: controller.signal })
     clearTimeout(timeout)
     const data = await res.json()
     currentLocation.value = data
-    currentPhoto.value = 'http://10.6.18.198:3001' + data.image_url
+    currentPhoto.value = data.image_url
     usedLocationIds.value.add(data.id)
     console.log('当前地点：', data.name)
     return

@@ -21,6 +21,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// 路由模块
+const locationsRouter = require('./routes/locations');
+app.use('/api', locationsRouter(pool));
+
 app.get('/api/health', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT 1 AS ok');
