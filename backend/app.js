@@ -1,21 +1,11 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql2/promise');
+const pool = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// 数据库连接池
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 3306,
-  database: process.env.DB_NAME || 'njuxun',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  waitForConnections: true,
-  connectionLimit: 10,
-});
 
 app.use(cors());
 app.use(express.json());
