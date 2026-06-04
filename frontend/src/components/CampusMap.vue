@@ -1,14 +1,19 @@
 <template>
-  <div ref="mapWrapper" class="map-wrapper" :style="{ width: width + 'px', height: height + 'px' }">
-    <div class="image-container" ref="imageContainer">
-      <img
-          :src="mapImage"
-          class="map-image"
-          @click="handleClick"
-          draggable="false"
-      />
-    </div>
-    <svg class="marker-layer" :viewBox="'0 0 ' + mapWidth + ' ' + mapHeight">
+  <div ref="mapWrapper" class="map-wrapper" :style="wrapperStyle">
+    <img
+        ref="mapImg"
+        :src="mapImage"
+        class="map-image"
+        :style="imageStyle"
+        @click="handleClick"
+        draggable="false"
+    />
+    <svg
+        class="marker-layer"
+        :style="svgStyle"
+        :viewBox="'0 0 ' + mapWidth + ' ' + mapHeight"
+        preserveAspectRatio="none"
+    >
       <line
           v-if="polyline.length === 2"
           :x1="polyline[0].x" :y1="polyline[0].y"
@@ -26,7 +31,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 
 const props = defineProps({
   mapImage: { type: String, default: '/gulou_map.png' },
@@ -41,17 +46,127 @@ const props = defineProps({
 
 const emit = defineEmits(['mapClick'])
 const mapWrapper = ref(null)
-const imageContainer = ref(null)
+const mapImg = ref(null)
+
+// 图片实际渲染区域的尺寸和位置（由 JS 统一计算，图片和 SVG 共用）
+const fit = reactive({
+  renderedWidth: props.width,
+  renderedHeight: props.height,
+  offsetX: 0,
+  offsetY: 0
+})
+
+const wrapperStyle = computed(() => ({
+  width: props.width + 'px',
+  height: props.height + 'px'
+}))
+
+// 图片和 SVG 使用完全相同的尺寸和位置，避免各自信箱机制产生差异
+const imageStyle = computed(() => ({
+  width: fit.renderedWidth + 'px',
+  height: fit.renderedHeight + 'px',
+  position: 'absolute',
+  left: fit.offsetX + 'px',
+  top: fit.offsetY + 'px'
+}))
+
+const svgStyle = computed(() => ({
+  position: 'absolute',
+  left: fit.offsetX + 'px',
+  top: fit.offsetY + 'px',
+  width: fit.renderedWidth + 'px',
+  height: fit.renderedHeight + 'px',
+  pointerEvents: 'none'
+}))
+
+function recalcFit() {
+  const img = mapImg.value
+  if (!img || !img.naturalWidth || !img.naturalHeight) return
+
+  const containerW = props.width
+  const containerH = props.height
+  const imageAspect = img.naturalWidth / img.naturalHeight
+  const containerAspect = containerW / containerH
+
+  let rw, rh, ox, oy
+
+  if (imageAspect > containerAspect) {
+    rw = containerW
+    rh = containerW / imageAspect
+    ox = 0
+    oy = (containerH - rh) / 2
+  } else {
+    rh = containerH
+    rw = containerH * imageAspect
+    ox = (containerW - rw) / 2
+    oy = 0
+  }
+
+  fit.renderedWidth = rw
+  fit.renderedHeight = rh
+  fit.offsetX = ox
+  fit.offsetY = oy
+}
 
 function handleClick(e) {
   if (!props.clickable) return
-  const rect = imageContainer.value.getBoundingClientRect()
-  const scaleX = props.mapWidth / rect.width
-  const scaleY = props.mapHeight / rect.height
-  const x = Math.round((e.clientX - rect.left) * scaleX)
-  const y = Math.round((e.clientY - rect.top) * scaleY)
-  emit('mapClick', { x, y })
+
+  // 点击位置相对于图片渲染区域的坐标
+  const imgEl = mapImg.value
+  if (!imgEl) return
+  const imgRect = imgEl.getBoundingClientRect()
+
+  const clickX = e.clientX - imgRect.left
+  const clickY = e.clientY - imgRect.top
+
+  // 缩放到地图坐标（无需信箱偏移，因为图片和 SVG 已精确对齐）
+  const x = Math.round(clickX * (props.mapWidth / fit.renderedWidth))
+  const y = Math.round(clickY * (props.mapHeight / fit.renderedHeight))
+
+  const clampedX = Math.max(0, Math.min(props.mapWidth, x))
+  const clampedY = Math.max(0, Math.min(props.mapHeight, y))
+
+  emit('mapClick', { x: clampedX, y: clampedY })
 }
+
+function onImageLoad() {
+  recalcFit()
+}
+
+let resizeObserver = null
+
+onMounted(() => {
+  const img = mapImg.value
+  if (img) {
+    if (img.complete) {
+      recalcFit()
+    }
+    img.addEventListener('load', onImageLoad)
+  }
+
+  // 监听容器尺寸变化
+  if (mapWrapper.value) {
+    resizeObserver = new ResizeObserver(() => {
+      recalcFit()
+    })
+    resizeObserver.observe(mapWrapper.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  const img = mapImg.value
+  if (img) {
+    img.removeEventListener('load', onImageLoad)
+  }
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+  }
+})
+
+// 当 width/height props 变化时重新计算
+watch([() => props.width, () => props.height], () => {
+  nextTick(() => recalcFit())
+})
 </script>
 
 <style scoped>
@@ -61,30 +176,14 @@ function handleClick(e) {
   border-radius: 12px;
   cursor: crosshair;
   background: #e8e8e8;
-  width: 100%;
-  height: 100%;
-}
-.image-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 .map-image {
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
+  /* object-fit 不再需要，由 JS 手动控制尺寸 */
+  user-select: none;
+  -webkit-user-drag: none;
 }
 .marker-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
+  z-index: 2;
 }
 </style>
-
