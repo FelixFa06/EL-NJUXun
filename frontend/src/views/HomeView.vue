@@ -42,7 +42,11 @@
     </div>
 
     <!-- 主页面内容 -->
-    <div class="home-content" :class="{ 'blur-bg': showNotice }">
+    <div
+      class="home-content"
+      :class="{ 'blur-bg': showNotice }"
+      :style="{ backgroundImage: `url(${bgImage})` }"
+    >
       <div class="home-overlay"></div>
       <div class="home-center">
         <div class="title-group">
@@ -62,6 +66,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import bgImage from '../assets/nju_bg_1.jpg'
 
 const showNotice = ref(true)
 
@@ -221,7 +226,7 @@ function closeNotice() {
 .home-content {
   width: 100%;
   height: 100%;
-  background: url('../assets/nju_bg_1.jpg') center center / cover no-repeat;
+  background: center center / cover no-repeat;
   background-color: #1A1A5C; /* 图片加载前的后备色 */
   position: relative;
   display: flex;
@@ -242,9 +247,9 @@ function closeNotice() {
   height: 100%;
   background: linear-gradient(
     135deg,
-    rgba(26, 26, 92, 0.55) 0%,
-    rgba(59, 45, 122, 0.4) 50%,
-    rgba(26, 26, 92, 0.55) 100%
+    rgba(26, 26, 92, 0.35) 0%,
+    rgba(59, 45, 122, 0.2) 50%,
+    rgba(26, 26, 92, 0.35) 100%
   );
 }
 

@@ -15,8 +15,18 @@
         />
       </div>
       <div class="photo-area">
-        <img :src="currentPhoto" alt="校园照片" v-if="currentPhoto" />
-        <p v-else>加载中...</p>
+        <div class="photo-loading" v-if="photoLoading">
+          <span>📷 照片加载中...</span>
+        </div>
+        <img
+          v-show="currentPhoto && !photoLoading"
+          :key="currentPhoto"
+          :src="currentPhoto"
+          alt="校园照片"
+          @load="onPhotoLoaded"
+          @error="onPhotoError"
+        />
+        <p v-if="!currentPhoto && !photoLoading">暂无照片</p>
       </div>
     </div>
 
@@ -88,6 +98,7 @@ const hasClicked = ref(false)
 const showResult = ref(false)
 const currentLocation = ref(null)
 const currentPhoto = ref('')
+const photoLoading = ref(false)
 const result = ref(null)
 const currentRound = ref(1)
 const totalRounds = ref(TOTAL_ROUNDS)
@@ -112,6 +123,9 @@ async function fetchRandomLocation() {
     usedLocationIds.value.clear()
   }
 
+  photoLoading.value = true
+  currentPhoto.value = ''
+
   try {
     const exclude = [...usedLocationIds.value].join(',')
     const controller = new AbortController()
@@ -132,8 +146,10 @@ async function fetchRandomLocation() {
     }
 
     currentLocation.value = data
-    currentPhoto.value = data.image_url
-    usedLocationIds.value.add(data.id)
+    // 添加缓存破坏参数，确保浏览器重新加载
+    currentPhoto.value = addCacheBuster(data.image_url)
+    // 统一使用 image_url 追踪已用地点
+    usedLocationIds.value.add(data.image_url)
     console.log('当前地点：', data.name)
     return
   } catch (err) {
@@ -154,16 +170,16 @@ async function loadLocalLocation() {
     )
 
     if (available.length === 0) {
-      console.warn('所有地点已用过')
+      console.warn('所有地点已用过，重置已用列表')
       usedLocationIds.value.clear()
       const randomIndex = Math.floor(Math.random() * allLocations.length)
       currentLocation.value = allLocations[randomIndex]
-      currentPhoto.value = allLocations[randomIndex].image_url
+      currentPhoto.value = addCacheBuster(allLocations[randomIndex].image_url)
       usedLocationIds.value.add(allLocations[randomIndex].image_url)
     } else {
       const randomIndex = Math.floor(Math.random() * available.length)
       currentLocation.value = available[randomIndex]
-      currentPhoto.value = available[randomIndex].image_url
+      currentPhoto.value = addCacheBuster(available[randomIndex].image_url)
       usedLocationIds.value.add(available[randomIndex].image_url)
     }
     console.log('当前地点：', currentLocation.value.name)
@@ -186,6 +202,22 @@ const markers = computed(() => {
 function onMapClick(pos) {
   clickPos.value = { x: pos.x, y: pos.y }
   hasClicked.value = true
+}
+
+// 为图片 URL 添加缓存破坏参数，防止浏览器使用缓存
+function addCacheBuster(url) {
+  if (!url) return ''
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}_t=${Date.now()}`
+}
+
+function onPhotoLoaded() {
+  photoLoading.value = false
+}
+
+function onPhotoError() {
+  photoLoading.value = false
+  console.error('照片加载失败：', currentPhoto.value)
 }
 
 function submitGuess() {
@@ -231,6 +263,8 @@ function nextRound() {
   hasClicked.value = false
   showResult.value = false
   result.value = null
+  currentPhoto.value = ''
+  photoLoading.value = true
   fetchRandomLocation()
 }
 
@@ -249,6 +283,8 @@ function restartGame() {
   hasClicked.value = false
   showResult.value = false
   result.value = null
+  currentPhoto.value = ''
+  photoLoading.value = true
   fetchRandomLocation()
 }
 
@@ -256,6 +292,7 @@ function restartGame() {
 onMounted(() => {
   updateMapSize()
   window.addEventListener('resize', updateMapSize)
+  photoLoading.value = true
   fetchRandomLocation()
 })
 
@@ -298,12 +335,23 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 .photo-area img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   background: #e0e0e0;
+}
+.photo-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #888;
+  font-size: 18px;
+  background: #f5f5f5;
 }
 .map-area {
   flex: 2;
