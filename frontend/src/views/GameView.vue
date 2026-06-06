@@ -19,7 +19,7 @@
           <span>📷 照片加载中...</span>
         </div>
         <img
-          v-show="currentPhoto && !photoLoading"
+          v-show="currentPhoto"
           :key="currentPhoto"
           :src="currentPhoto"
           alt="校园照片"
@@ -344,14 +344,15 @@ onUnmounted(() => {
   background: #e0e0e0;
 }
 .photo-loading {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
   color: #888;
   font-size: 18px;
   background: #f5f5f5;
+  z-index: 1;
 }
 .map-area {
   flex: 2;
