@@ -6,12 +6,12 @@
       <span class="total-score">累计得分：{{ totalScore }} 分</span>
     </div>
     <div class="game-layout">
-      <div class="map-area">
+      <div class="map-area" ref="mapContainer">
         <CampusMap
             @mapClick="onMapClick"
             :markers="markers"
-            :width="400"
-            :height="600"
+            :width="mapDisplayWidth"
+            :height="mapDisplayHeight"
         />
       </div>
       <div class="photo-area">
@@ -66,10 +66,23 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import CampusMap from '../components/CampusMap.vue'
 
 const TOTAL_ROUNDS = 10
+const mapContainer = ref(null)
+const mapDisplayWidth = ref(400)
+const mapDisplayHeight = ref(600)
+
+function updateMapSize() {
+  if (mapContainer.value) {
+    const w = mapContainer.value.clientWidth
+    mapDisplayWidth.value = w
+    // 保持 2:3 宽高比
+    mapDisplayHeight.value = Math.round(w * 1.5)
+  }
+}
+
 const clickPos = ref({ x: 0, y: 0 })
 const hasClicked = ref(false)
 const showResult = ref(false)
@@ -239,9 +252,15 @@ function restartGame() {
   fetchRandomLocation()
 }
 
-// 页面加载时自动获取一个地点
+// 页面加载时自动获取一个地点，并设置地图响应式尺寸
 onMounted(() => {
+  updateMapSize()
+  window.addEventListener('resize', updateMapSize)
   fetchRandomLocation()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateMapSize)
 })
 </script>
 
@@ -251,6 +270,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  touch-action: manipulation;
 }
 .progress-bar {
   display: flex;
@@ -359,17 +379,36 @@ button:hover {
   background: #1547b8;
 }
 @media (max-width: 768px) {
+  .game-container {
+    padding: 10px;
+    gap: 10px;
+  }
   .game-layout {
     flex-direction: column;
     height: auto;
   }
   .map-area {
     width: 100%;
-    height: 400px;
+    height: auto;
   }
   .photo-area {
     width: 100%;
-    height: 250px;
+    height: 220px;
+  }
+  .result-detail {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .info-panel {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .progress-bar {
+    font-size: 13px;
+  }
+  h2 {
+    font-size: 16px;
   }
 }
 
