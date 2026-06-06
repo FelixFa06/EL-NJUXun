@@ -70,6 +70,7 @@ const scale = ref(1)
 const panX = ref(0)  // 平移偏移（渲染像素）
 const panY = ref(0)
 const touchCache = ref(null)  // 多点触控缓存
+const justTapped = ref(false) // 防止 touch 和 click 重复触发
 
 const MIN_SCALE = 1
 const MAX_SCALE = 5
@@ -191,21 +192,23 @@ function recalcFit() {
 
 function handleClick(e) {
   if (!props.clickable) return
+  // 手机端已通过 touch 事件处理，避免重复触发
+  if (justTapped.value) {
+    justTapped.value = false
+    return
+  }
 
   const imgEl = mapImg.value
   if (!imgEl) return
   const imgRect = imgEl.getBoundingClientRect()
 
-  // 点击在屏幕上的位置相对于图片元素
   const clickX = e.clientX - imgRect.left
   const clickY = e.clientY - imgRect.top
 
-  // 修正缩放和平移：反向变换得到原始图片坐标
   const s = scale.value
   const origX = clickX / s + panX.value
   const origY = clickY / s + panY.value
 
-  // 缩放到地图坐标
   const x = Math.round(origX * (props.mapWidth / fit.renderedWidth))
   const y = Math.round(origY * (props.mapHeight / fit.renderedHeight))
 
@@ -220,6 +223,8 @@ function onImageLoad() {
 }
 
 // ===== 触摸手势处理 =====
+const DRAG_THRESHOLD = 5  // 移动超过 5px 才算拖动
+
 function getTouchDist(touches) {
   const dx = touches[0].clientX - touches[1].clientX
   const dy = touches[0].clientY - touches[1].clientY
@@ -235,59 +240,106 @@ function getTouchMidpoint(touches) {
 
 function onTouchStart(e) {
   if (!props.clickable) return
+
   if (e.touches.length === 2) {
-    // 双指开始：记录初始状态
+    // 双指：记录初始状态用于缩放 + 平移
+    const mid = getTouchMidpoint(e.touches)
     touchCache.value = {
-      dist: getTouchDist(e.touches),
-      midX: getTouchMidpoint(e.touches).x,
-      midY: getTouchMidpoint(e.touches).y,
-      startScale: scale.value,
+      mode: 'pinch',
+      initialDist: getTouchDist(e.touches),
+      initialMidX: mid.x,
+      initialMidY: mid.y,
+      initialScale: scale.value,
+      initialPanX: panX.value,
+      initialPanY: panY.value,
+    }
+  } else if (e.touches.length === 1) {
+    // 单指：可能是点击或拖动
+    touchCache.value = {
+      mode: 'single',
+      startX: e.touches[0].clientX,
+      startY: e.touches[0].clientY,
       startPanX: panX.value,
       startPanY: panY.value,
+      moved: false,
     }
   }
 }
 
 function onTouchMove(e) {
-  if (!touchCache.value || e.touches.length !== 2) return
-  e.preventDefault()
-
   const tc = touchCache.value
-  const newDist = getTouchDist(e.touches)
-  const mid = getTouchMidpoint(e.touches)
+  if (!tc) return
 
-  // 缩放：基于初始双指距离的比例变化
-  let newScale = tc.startScale * (newDist / tc.dist)
-  newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale))
+  if (tc.mode === 'pinch' && e.touches.length === 2) {
+    e.preventDefault()
+    const newDist = getTouchDist(e.touches)
+    const mid = getTouchMidpoint(e.touches)
 
-  // 平移：中点位移除以 scale（补偿缩放导致的位移量变化）
-  const wrapperRect = mapWrapper.value.getBoundingClientRect()
-  const dMidX = mid.x - tc.midX
-  const dMidY = mid.y - tc.midY
+    // 缩放：基于初始距离的比例（不更新缓存，始终用 touchstart 基准）
+    let newScale = tc.initialScale * (newDist / tc.initialDist)
+    newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale))
 
-  let newPanX = tc.startPanX - dMidX / tc.startScale
-  let newPanY = tc.startPanY - dMidY / tc.startScale
+    // 平移：中点位移（屏幕像素）→ 转换为渲染像素
+    const dMidX = mid.x - tc.initialMidX
+    const dMidY = mid.y - tc.initialMidY
+    const newPanX = tc.initialPanX - dMidX
+    const newPanY = tc.initialPanY - dMidY
 
-  scale.value = newScale
-  panX.value = newPanX
-  panY.value = newPanY
-  clampPan()
+    scale.value = newScale
+    panX.value = newPanX
+    panY.value = newPanY
+    clampPan()
+  } else if (tc.mode === 'single' && e.touches.length === 1) {
+    const dx = e.touches[0].clientX - tc.startX
+    const dy = e.touches[0].clientY - tc.startY
+    const dist = Math.sqrt(dx * dx + dy * dy)
 
-  // 更新缓存为当前值，便于下一帧增量计算
-  touchCache.value = {
-    dist: newDist,
-    midX: mid.x,
-    midY: mid.y,
-    startScale: newScale,
-    startPanX: newPanX,
-    startPanY: newPanY,
+    if (dist > DRAG_THRESHOLD) {
+      tc.moved = true
+      // 拖动平移：反向移动地图
+      panX.value = tc.startPanX - dx
+      panY.value = tc.startPanY - dy
+      clampPan()
+    }
   }
 }
 
 function onTouchEnd(e) {
+  if (touchCache.value?.mode === 'single' && !touchCache.value.moved && e.touches.length === 0) {
+    // 单指没拖动 = 点击，手动触发地图坐标计算
+    const tc = touchCache.value
+    touchCache.value = null
+    handleClickFromTouch(tc.startX, tc.startY)
+    return
+  }
   if (e.touches.length < 2) {
     touchCache.value = null
   }
+}
+
+// 从触摸坐标模拟点击
+function handleClickFromTouch(clientX, clientY) {
+  if (!props.clickable) return
+  const imgEl = mapImg.value
+  if (!imgEl) return
+  const imgRect = imgEl.getBoundingClientRect()
+
+  const clickX = clientX - imgRect.left
+  const clickY = clientY - imgRect.top
+
+  const s = scale.value
+  const origX = clickX / s + panX.value
+  const origY = clickY / s + panY.value
+
+  const x = Math.round(origX * (props.mapWidth / fit.renderedWidth))
+  const y = Math.round(origY * (props.mapHeight / fit.renderedHeight))
+
+  const clampedX = Math.max(0, Math.min(props.mapWidth, x))
+  const clampedY = Math.max(0, Math.min(props.mapHeight, y))
+
+  // 标记刚刚由 touch 触发了点击，阻止后续 click 事件重复触发
+  justTapped.value = true
+  emit('mapClick', { x: clampedX, y: clampedY })
 }
 
 let resizeObserver = null
