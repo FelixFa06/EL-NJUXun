@@ -46,8 +46,8 @@
     <template v-else>
       <div class="info-panel" v-if="showResult && result">
         <div class="result-detail">
-          <span>📍 真实位置：{{ result.locationName }}（{{ result.realLocation.px_x }}, {{ result.realLocation.px_y }}）</span>
-          <span>🎯 你猜的位置：x={{ clickPos.x }}, y={{ clickPos.y }}</span>
+          <span>📍 真实位置：（{{ result.realLocation.px_x }}, {{ result.realLocation.px_y }}）</span>
+          <span>🎯 你猜的位置：（{{ clickPos.x }}, {{ clickPos.y }}）</span>
           <span>📏 距离：<strong>{{ result.distance }} 米</strong></span>
           <span>⭐ 得分：<strong>{{ result.score }} 分</strong></span>
         </div>
@@ -108,14 +108,23 @@ async function fetchRandomLocation() {
       : '/api/locations/random'
     const res = await fetch(url, { signal: controller.signal })
     clearTimeout(timeout)
+
+    // 检查 HTTP 状态码，非 2xx 或响应数据无效时抛出错误走 fallback
+    if (!res.ok) {
+      throw new Error(`后端返回 ${res.status}`)
+    }
     const data = await res.json()
+    if (!data || !data.image_url) {
+      throw new Error('响应数据缺少 image_url')
+    }
+
     currentLocation.value = data
     currentPhoto.value = data.image_url
     usedLocationIds.value.add(data.id)
     console.log('当前地点：', data.name)
     return
   } catch (err) {
-    console.warn('后端不可用，使用本地数据')
+    console.warn('后端不可用，使用本地数据:', err.message)
   }
   // fallback：从本地 JSON 随机选一个未用过的
   await loadLocalLocation()
