@@ -8,7 +8,7 @@
 set -e
 
 echo "📦 拉取最新代码..."
-git pull origin main
+git pull
 
 echo ""
 echo "📦 安装后端依赖..."
