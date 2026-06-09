@@ -206,8 +206,10 @@ function handleClick(e) {
   const clickY = e.clientY - imgRect.top
 
   const s = scale.value
-  const origX = clickX / s + panX.value
-  const origY = clickY / s + panY.value
+  // getBoundingClientRect() 已包含 CSS transform 的平移效果，
+  // clickX/s 已正确映射到未缩放图层坐标，无需再加 panX
+  const origX = clickX / s
+  const origY = clickY / s
 
   const x = Math.round(origX * (props.mapWidth / fit.renderedWidth))
   const y = Math.round(origY * (props.mapHeight / fit.renderedHeight))
@@ -328,8 +330,10 @@ function handleClickFromTouch(clientX, clientY) {
   const clickY = clientY - imgRect.top
 
   const s = scale.value
-  const origX = clickX / s + panX.value
-  const origY = clickY / s + panY.value
+  // getBoundingClientRect() 已包含 CSS transform 的平移效果，
+  // clickX/s 已正确映射到未缩放图层坐标，无需再加 panX
+  const origX = clickX / s
+  const origY = clickY / s
 
   const x = Math.round(origX * (props.mapWidth / fit.renderedWidth))
   const y = Math.round(origY * (props.mapHeight / fit.renderedHeight))
