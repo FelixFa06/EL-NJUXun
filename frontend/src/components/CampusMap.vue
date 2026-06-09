@@ -6,6 +6,7 @@
     @touchstart="onTouchStart"
     @touchmove.prevent="onTouchMove"
     @touchend="onTouchEnd"
+    @mousedown="onMouseDown"
     @dblclick="zoomIn"
   >
     <div class="map-transform-layer" :style="transformLayerStyle">
@@ -72,6 +73,8 @@ const panX = ref(0)  // 平移偏移（渲染像素）
 const panY = ref(0)
 const touchCache = ref(null)  // 多点触控缓存
 const justTapped = ref(false) // 防止 touch 和 click 重复触发
+const mouseDrag = ref(null)   // 鼠标拖拽状态
+const justDragged = ref(false) // 防止拖拽后触发 click
 
 const MIN_SCALE = 1
 const MAX_SCALE = 5
@@ -198,6 +201,11 @@ function handleClick(e) {
     justTapped.value = false
     return
   }
+  // 鼠标拖拽后不触发点击
+  if (justDragged.value) {
+    justDragged.value = false
+    return
+  }
 
   const imgEl = mapImg.value
   if (!imgEl) return
@@ -219,6 +227,48 @@ function handleClick(e) {
   const clampedY = Math.max(0, Math.min(props.mapHeight, y))
 
   emit('mapClick', { x: clampedX, y: clampedY })
+}
+
+// ===== 鼠标拖拽平移（电脑端） =====
+function onMouseDown(e) {
+  if (!props.clickable) return
+  // 只处理左键
+  if (e.button !== 0) return
+  mouseDrag.value = {
+    startX: e.clientX,
+    startY: e.clientY,
+    startPanX: panX.value,
+    startPanY: panY.value,
+    moved: false
+  }
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
+}
+
+function onMouseMove(e) {
+  const md = mouseDrag.value
+  if (!md) return
+
+  const dx = e.clientX - md.startX
+  const dy = e.clientY - md.startY
+  const dist = Math.sqrt(dx * dx + dy * dy)
+
+  if (dist > DRAG_THRESHOLD) {
+    md.moved = true
+    panX.value = md.startPanX - dx
+    panY.value = md.startPanY - dy
+    clampPan()
+  }
+}
+
+function onMouseUp() {
+  window.removeEventListener('mousemove', onMouseMove)
+  window.removeEventListener('mouseup', onMouseUp)
+
+  if (mouseDrag.value?.moved) {
+    justDragged.value = true
+  }
+  mouseDrag.value = null
 }
 
 function onImageLoad() {
