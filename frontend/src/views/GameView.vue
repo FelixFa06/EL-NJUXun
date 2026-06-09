@@ -30,54 +30,33 @@
       </div>
     </div>
 
-    <!-- 游戏结束面板 -->
-    <div class="game-over-panel" v-if="gameOver">
-      <h3>🎉 游戏结束！</h3>
-      <div class="final-score">
-        <span>总分：<strong>{{ totalScore }}</strong> / {{ totalRounds * 100 }} 分</span>
-        <span>均分：<strong>{{ avgScore }}</strong> 分</span>
-      </div>
-      <table class="score-table">
-        <thead>
-          <tr><th>题号</th><th>距离（米）</th><th>得分</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="(r, i) in scoreHistory" :key="i">
-            <td>{{ i + 1 }}</td>
-            <td>{{ r.distance }}</td>
-            <td>{{ r.score }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <button @click="restartGame">再来一局</button>
-    </div>
-
     <!-- 游戏中的信息面板 -->
-    <template v-else>
-      <div class="info-panel" v-if="showResult && result">
-        <div class="result-detail">
-          <span>📍 真实位置：（{{ result.realLocation.px_x }}, {{ result.realLocation.px_y }}）</span>
-          <span>🎯 你猜的位置：（{{ clickPos.x }}, {{ clickPos.y }}）</span>
-          <span>📏 距离：<strong>{{ result.distance }} 米</strong></span>
-          <span>⭐ 得分：<strong>{{ result.score }} 分</strong></span>
-        </div>
-        <button v-if="currentRound < totalRounds" @click="nextRound">下一题</button>
-        <button v-else @click="finishGame">查看结果</button>
+    <div class="info-panel" v-if="showResult && result">
+      <div class="result-detail">
+        <span>📍 真实位置：（{{ result.realLocation.px_x }}, {{ result.realLocation.px_y }}）</span>
+        <span>🎯 你猜的位置：（{{ clickPos.x }}, {{ clickPos.y }}）</span>
+        <span>📏 距离：<strong>{{ result.distance }} 米</strong></span>
+        <span>⭐ 得分：<strong>{{ result.score }} 分</strong></span>
       </div>
-      <div class="info-panel" v-else-if="hasClicked">
-        <p>你点击的位置：x={{ clickPos.x }}, y={{ clickPos.y }}</p>
-        <button @click="submitGuess">提交答案</button>
-      </div>
-      <div class="info-panel" v-else>
-        <p>请在地图上点击选择位置</p>
-      </div>
-    </template>
+      <button v-if="currentRound < totalRounds" @click="nextRound">下一题</button>
+      <button v-else @click="finishGame">查看结果</button>
+    </div>
+    <div class="info-panel" v-else-if="hasClicked">
+      <p>你点击的位置：x={{ clickPos.x }}, y={{ clickPos.y }}</p>
+      <button @click="submitGuess">提交答案</button>
+    </div>
+    <div class="info-panel" v-else>
+      <p>请在地图上点击选择位置</p>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import CampusMap from '../components/CampusMap.vue'
+
+const router = useRouter()
 
 const TOTAL_ROUNDS = 10
 const mapContainer = ref(null)
@@ -104,7 +83,6 @@ const result = ref(null)
 const currentRound = ref(1)
 const totalRounds = ref(TOTAL_ROUNDS)
 const scoreHistory = ref([])
-const gameOver = ref(false)
 const usedLocationIds = ref(new Set())
 
 const totalScore = computed(() => {
@@ -269,17 +247,22 @@ function nextRound() {
   fetchRandomLocation()
 }
 
-// 最后一题提交后，结束游戏
+// 最后一题提交后，保存结果并跳转结果页
 function finishGame() {
-  gameOver.value = true
+  sessionStorage.setItem('gameResult', JSON.stringify({
+    scoreHistory: scoreHistory.value,
+    totalScore: totalScore.value,
+    avgScore: avgScore.value,
+    totalRounds: totalRounds.value
+  }))
+  router.push('/result')
 }
 
-// 重新开始
+// 重新开始（每次进入 /game 都会重置状态）
 function restartGame() {
   currentRound.value = 1
   scoreHistory.value = []
   usedLocationIds.value.clear()
-  gameOver.value = false
   clickPos.value = { x: 0, y: 0 }
   hasClicked.value = false
   showResult.value = false
@@ -289,12 +272,11 @@ function restartGame() {
   fetchRandomLocation()
 }
 
-// 页面加载时自动获取一个地点，并设置地图响应式尺寸
+// 每次进入页面自动重置状态并开始新游戏
 onMounted(() => {
   updateMapSize()
   window.addEventListener('resize', updateMapSize)
-  photoLoading.value = true
-  fetchRandomLocation()
+  restartGame()
 })
 
 onUnmounted(() => {
