@@ -10,6 +10,7 @@
         <CampusMap
             @mapClick="onMapClick"
             :markers="markers"
+            :polyline="polyline"
             :width="mapDisplayWidth"
             :height="mapDisplayHeight"
         />
@@ -176,6 +177,17 @@ const markers = computed(() => {
     list.push({ x: result.value.realLocation.px_x, y: result.value.realLocation.px_y, type: 'real' })
   }
   return list
+})
+
+// 猜测点与真实位置之间的连线
+const polyline = computed(() => {
+  if (showResult.value && result.value && hasClicked.value) {
+    return [
+      { x: clickPos.value.x, y: clickPos.value.y },
+      { x: result.value.realLocation.px_x, y: result.value.realLocation.px_y }
+    ]
+  }
+  return []
 })
 
 function onMapClick(pos) {

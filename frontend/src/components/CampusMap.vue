@@ -27,13 +27,14 @@
             v-if="polyline.length === 2"
             :x1="polyline[0].x" :y1="polyline[0].y"
             :x2="polyline[1].x" :y2="polyline[1].y"
-            stroke="#FF33FF" stroke-width="3" stroke-dasharray="8,4"
+            stroke="#D946EF" stroke-width="4" stroke-dasharray="10,6"
+            stroke-linecap="round"
         />
         <circle
             v-for="(m, i) in markers" :key="i"
-            :cx="m.x" :cy="m.y" r="8"
+            :cx="m.x" :cy="m.y" r="12"
             :fill="m.type === 'real' ? '#FF4444' : '#4488FF'"
-            stroke="white" stroke-width="2"
+            stroke="white" stroke-width="3"
         />
       </svg>
     </div>
