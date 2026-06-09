@@ -29,7 +29,7 @@
           </div>
           <div class="notice-section">
             <h3>📦 开源地址</h3>
-            <p>本项目代码已开源至 GitHub 和 Gitee：<a href="https://github.com/FelixFa06/EL-NJUXun" target="_blank">GitHub</a> · <a href="https://gitee.com/Ecommerize/el-njuxun" target="_blank">Gitee</a></p>
+            <p>本项目代码已开源至 GitHub 和 Gitee：<br>GitHub — https://github.com/FelixFa06/EL-NJUXun<br>Gitee — https://gitee.com/Ecommerize/el-njuxun</p>
           </div>
           <div class="notice-footer-info">
             <p>© 2026 南京大学 EL 大赛交互组</p>
