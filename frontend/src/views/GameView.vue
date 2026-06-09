@@ -440,11 +440,14 @@ button:hover {
   }
   .map-area {
     width: 100%;
-    height: auto;
+    height: 50vh;
+    min-height: 300px;
+    order: 2;
   }
   .photo-area {
     width: 100%;
     height: 220px;
+    order: 1;
   }
   .result-detail {
     flex-direction: column;
