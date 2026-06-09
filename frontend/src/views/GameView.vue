@@ -86,10 +86,11 @@ const mapDisplayHeight = ref(600)
 
 function updateMapSize() {
   if (mapContainer.value) {
-    const w = mapContainer.value.clientWidth
-    mapDisplayWidth.value = w
-    // 保持 2:3 宽高比
-    mapDisplayHeight.value = Math.round(w * 1.5)
+    mapDisplayWidth.value = mapContainer.value.clientWidth
+    // 使用容器实际高度，避免地图 wrapper 溢出覆盖下方信息面板
+    // 移动端 height:auto 时 clientHeight 由内容撑开，fallback 到宽度比例
+    const h = mapContainer.value.clientHeight
+    mapDisplayHeight.value = h > 0 ? h : Math.round(mapContainer.value.clientWidth * 1.5)
   }
 }
 
@@ -357,6 +358,7 @@ onUnmounted(() => {
 .map-area {
   flex: 2;
   height: 600px;
+  overflow: hidden;
 }
 .info-panel {
   padding: 12px 20px;
