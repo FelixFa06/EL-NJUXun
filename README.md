@@ -135,3 +135,7 @@ cd backend && npm run dev
 - Element Plus 注册（如需使用其组件）
 - 用户认证（JWT middleware 尚未实现）
 - 后端其他 API 端点（用户注册/登录、游戏记录保存/查询）
+
+## 许可证
+
+本项目基于 [MIT License](LICENSE) 开源。
