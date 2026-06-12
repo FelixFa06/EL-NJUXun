@@ -140,47 +140,23 @@ cd backend && npm run dev
 
 基于 **Ubuntu 20.04/22.04**，需预装 Node.js ≥18、MySQL ≥8.0、PM2、Nginx、Git。
 
-### 1. 克隆 & 配置
+### 首次部署
 
 ```bash
+# 1. 克隆项目并配置环境变量
 git clone <your-repo-url> /opt/njuxun && cd /opt/njuxun
-cp .env.example .env          # 编辑 .env，填入 MySQL 密码和 JWT 密钥
-```
+cp .env.example .env            # 编辑填入 MySQL 密码和 JWT 密钥
 
-### 2. 初始化数据库
+# 2. 修改 nginx.conf 中的 server_name 为你的域名或 IP
 
-```bash
-mysql -u root -p < backend/scripts/init_db.sql
-mysql -u root -p njuxun < backend/scripts/seed_locations.sql
-```
+# 3. 一键部署（建库 → 种子数据 → Nginx → 依赖 → 构建 → 启动）
+bash deploy.sh --setup
 
-### 3. 安装依赖 & 构建
+# 4. 设置开机自启（按提示执行输出的命令）
+pm2 startup
 
-```bash
-cd backend && npm install --production && cd ..
-cd frontend && npm install && npm run build && cd ..
-```
-
-### 4. Nginx 反向代理
-
-```bash
-sudo cp nginx.conf /etc/nginx/conf.d/njuxun.conf   # 按需修改 server_name
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-### 5. 启动服务
-
-```bash
-cd backend
-pm2 start ecosystem.config.js
-pm2 save && pm2 startup     # 保存进程 + 开机自启
-```
-
-### 6. 验证
-
-```bash
-pm2 status                           # 应显示 njuxun online
-curl http://localhost:3000/api/health  # 应返回 {"status":"ok"}
+# 5. 验证
+curl http://localhost:3000/api/health
 ```
 
 浏览器访问 `http://<你的IP或域名>` 即可。
