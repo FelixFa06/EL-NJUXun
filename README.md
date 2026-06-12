@@ -136,6 +136,63 @@ cd backend && npm run dev
 - 用户认证（JWT middleware 尚未实现）
 - 后端其他 API 端点（用户注册/登录、游戏记录保存/查询）
 
+## 部署指南
+
+基于 **Ubuntu 20.04/22.04**，需预装 Node.js ≥18、MySQL ≥8.0、PM2、Nginx、Git。
+
+### 1. 克隆 & 配置
+
+```bash
+git clone <your-repo-url> /opt/njuxun && cd /opt/njuxun
+cp .env.example .env          # 编辑 .env，填入 MySQL 密码和 JWT 密钥
+```
+
+### 2. 初始化数据库
+
+```bash
+mysql -u root -p < backend/scripts/init_db.sql
+mysql -u root -p njuxun < backend/scripts/seed_locations.sql
+```
+
+### 3. 安装依赖 & 构建
+
+```bash
+cd backend && npm install --production && cd ..
+cd frontend && npm install && npm run build && cd ..
+```
+
+### 4. Nginx 反向代理
+
+```bash
+sudo cp nginx.conf /etc/nginx/conf.d/njuxun.conf   # 按需修改 server_name
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### 5. 启动服务
+
+```bash
+cd backend
+pm2 start ecosystem.config.js
+pm2 save && pm2 startup     # 保存进程 + 开机自启
+```
+
+### 6. 验证
+
+```bash
+pm2 status                           # 应显示 njuxun online
+curl http://localhost:3000/api/health  # 应返回 {"status":"ok"}
+```
+
+浏览器访问 `http://<你的IP或域名>` 即可。
+
+### 后续更新
+
+```bash
+cd /opt/njuxun && bash deploy.sh    # git pull → 安装依赖 → 构建 → 重启
+```
+
+---
+
 ## 许可证
 
 本项目基于 [MIT License](LICENSE) 开源。
