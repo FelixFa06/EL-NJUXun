@@ -4,17 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-南大图寻（NJUXun）— 2026 南京大学 EL 大赛交互组项目。一个基于校园地图照片的定位猜测游戏：玩家看到一张校园实景照片，在地图上点击猜测拍摄位置，系统根据实际坐标与猜测坐标的距离计算得分。
+南大图寻（NJUXun）— 2026 南京大学 EL 大赛交互组项目。玩家看到校园实景照片，在地图上点击猜测拍摄位置，系统根据实际坐标与猜测坐标的距离计算得分。每局 10 题，满分 1000 分。
 
 ## 技术栈
 
 - **前端**: Vue 3 (Composition API) + Vite 5 + Vue Router 4 + Pinia 3 + Element Plus 2 + Axios
-- **后端**: Node.js + Express 4 + MySQL (mysql2) + JWT 认证
+- **后端**: Node.js + Express 4 + MySQL (mysql2) + JWT 认证（jsonwebtoken + bcryptjs）
 - **无 TypeScript**，全部使用纯 JavaScript
 
 ### 依赖注册状态
 
-`frontend/src/main.js` 当前只注册了 `router`。以下依赖的实际状态：
+`frontend/src/main.js` 当前只注册了 `router`：
 
 - **Vue Router** ✅ 已注册（`app.use(router)`）
 - **Pinia** ❌ 仅安装，未 `createPinia()` / `app.use(pinia)`，stores 目录为空
@@ -37,11 +37,14 @@ cd backend && npm run dev
 # 后端生产启动
 cd backend && npm start
 
-# 数据库初始化（首次使用）
+# 数据库初始化（建库 + 建表）
 mysql -u root -p < backend/scripts/init_db.sql
+
+# 导入种子数据（24 个校园地点）
+mysql -u root -p njuxun < backend/scripts/seed_locations.sql
 ```
 
-> **注意**：`.env` 被 `.gitignore` 忽略，首次使用需 `cp .env.example .env` 并填写实际数据库密码和 JWT 密钥。后端启动依赖 `.env` 中的数据库连接信息。
+> **注意**：`.env` 被 `.gitignore` 忽略，首次使用需 `cp .env.example .env` 并填写实际 MySQL 密码和 JWT 密钥。后端启动依赖 `.env` 中的数据库连接信息。
 
 ## 项目架构
 
@@ -58,59 +61,99 @@ mysql -u root -p < backend/scripts/init_db.sql
 
 | 页面 | 状态 | 说明 |
 |------|------|------|
-| HomeView | 骨架 | 标题 + "开始探索"按钮（`<router-link>` 到 `/game`） |
-| GameView | 基础可用 | 地图点击 → 坐标捕获 → 蓝色标记显示 → `submitGuess()` 弹出 alert；照片区域为占位文字 |
-| ResultView | 占位 | 仅标题和一句描述文字 |
+| HomeView | 完整 | 首次进入弹出"玩家须知"（玩法+计分规则+开源地址），背景为南大校园照片，点击"开始探索"进入游戏 |
+| GameView | 完整 | 10 轮游戏：左侧地图点击猜测 → 右侧展示实景照片 → 提交答案 → 显示得分+红蓝标记+亮紫色连线 → 下一题/查看结果 |
+| ResultView | 完整 | 从 `sessionStorage` 读取结果，展示总分/均分/题数 + 每轮详情表格，支持再来一局/返回首页 |
 
-GameView 的核心交互流程已通：`CampusMap` 的 `@mapClick` → `onMapClick(pos)` 存储坐标 → computed `markers` 生成蓝色猜测标记 → 点击"提交答案"调用 `submitGuess()`（当前仅 `alert`，待接入后端 API）。
+### GameView 核心交互流程
+
+1. `onMounted` → `restartGame()` 重置状态 → `fetchRandomLocation()` 获取题目
+2. 用户点击地图 → `onMapClick(pos)` 存储坐标 → 蓝色猜测标记 + "提交答案"按钮
+3. 点击"提交答案" → `submitGuess()` 计算像素距离 × 比例尺 → 分段计分 → 显示红色真实标记 + 亮紫色虚线连线
+4. 点击"下一题" → `nextRound()` 递增轮次 → 重新获取题目
+5. 第 10 题提交后 → `finishGame()` 将结果写入 `sessionStorage` → `router.push('/result')`
+
+**计分公式**（距离 d 单位为米）：
+- d≤10: 100 分；d≤50: 80~99；d≤100: 60~79；d≤200: 40~59；d≤500: 20~39；d≤1000: 1~19；d>1000: 0
+
+**数据获取策略**：优先从后端 `GET /api/locations/random?exclude=id1,id2` 获取，3 秒超时或失败后降级到 `frontend/public/locations.json`（24 条本地数据）。使用 `image_url` 作为去重键。
 
 ### 地图组件坐标系统
 
-`CampusMap.vue` 是全项目最核心的组件，其坐标系统设计如下：
+`CampusMap.vue` 是全项目最核心的组件：
 
-- **原始图片尺寸**: 7087×10630 像素（鼓楼校区地图，`frontend/src/assets/gulou_map.png`）
-- **坐标转换**: 用户在屏幕上点击 → 通过 `getBoundingClientRect()` 获取显示尺寸 → 用 `原始尺寸/显示尺寸` 计算缩放比 → 得到原始图片坐标
-- **标记层**: 使用 SVG `<circle>` 覆盖在地图上，通过 `viewBox` 匹配原始图片尺寸实现坐标对齐
-- **连线**: 使用 SVG `<line>` 绘制猜测点与实际位置之间的虚线
+- **当前地图尺寸**: 2546×3914 像素（`frontend/src/assets/gulou_map.png`）
+- **原始高清版**: `gulou_map_original_7087x10630.png` 也存在于 assets 中，但代码未使用
+- **坐标转换**: 屏幕点击 → `getBoundingClientRect()` 获取图片显示尺寸 → `/scale` 消除缩放 → `×(mapWidth/renderedWidth)` 映射到原始像素坐标
+- **比例尺**: 0.34608 米/像素（硬编码在 GameView 的 `submitGuess` 中）
+- **标记层**: SVG `<circle>` 叠加在地图上，`viewBox` 匹配原始尺寸实现坐标对齐
+- **连线**: SVG `<line>` — 带 `stroke-dasharray` 的亮紫色虚线
 
-`CampusMap.vue` 的 props/events 接口：
-- Props: `mapImage`, `mapWidth`(默认7087), `mapHeight`(默认10630), `width`, `height`, `markers`(Array), `polyline`(Array), `clickable`
-- Events: `@mapClick` → `{ x, y }`（原始图片坐标）
+**缩放与平移功能**（2026-06 新增）：
+- 鼠标滚轮缩放 / 双指捏合缩放（1×~5×）
+- 鼠标拖拽平移 / 单指拖拽平移
+- 缩放按钮（+/−/↺）位于地图右下角
+- `DRAG_THRESHOLD = 5px` 区分拖动和点击
+- `ResizeObserver` 监听容器尺寸变化自动重算布局
 
-### 后端结构
+CampusMap props/events 接口：
+- Props: `mapImage`, `mapWidth`(默认2546), `mapHeight`(默认3914), `width`, `height`, `markers`(Array of `{x,y,type}`), `polyline`(Array of `{x,y}` × 2), `clickable`
+- Events: `@mapClick` → `{ x, y }`（原始图片像素坐标，已 clamp 到有效范围）
 
-后端目前是骨架阶段，`app.js` 只注册了 `cors`、`express.json()`、静态文件服务和一个 `/api/health` 健康检查端点。
+## 后端结构
 
-规划的目录结构：
-- `routes/` — 路由模块（当前为空）
-- `models/` — 数据模型（当前为空）
-- `middleware/` — 中间件，如 JWT 验证（当前为空）
-- `scripts/` — 数据导入脚本
-- `public/images/` — 校园实景照片
+### 实际状态（非骨架）
+
+`backend/app.js` 注册了 `cors`、`express.json()`、静态文件服务、路由模块和 SPA fallback：
+
+- `routes/locations.js` — `GET /api/locations/random?exclude=id1,id2`（随机取题，支持排除已选）
+- `GET /api/health` — 健康检查（含 `SELECT 1` 数据库连通性验证）
+- 生产环境托管 `frontend/dist/` 静态文件
+- `GET *` SPA fallback — 非 `/api` 路由全部返回 `index.html`
+- 监听 `0.0.0.0:PORT`（支持外部访问，默认 3000）
+
+### 目录
+
+```
+backend/
+├── routes/        — 路由模块（locations.js 已实现）
+├── models/        — 数据模型（预留，当前为空）
+├── middleware/     — 中间件（预留，当前为空，JWT 验证待实现）
+├── config/        — database.js（mysql2 连接池，connectionLimit:10）
+├── scripts/       — init_db.sql + seed_locations.sql（24 条种子数据）
+└── public/images/ — 校园实景照片
+```
 
 ### 数据库
 
-使用 MySQL，数据库名 `njuxun`。初始化脚本：`backend/scripts/init_db.sql`。通过 `.env` 配置连接信息，参考 `.env.example` 创建 `.env`。
+MySQL 数据库名 `njuxun`，三张表（详见 `backend/scripts/init_db.sql`）：
 
-三张核心表结构：
+- **users** — `id`, `username`(UNIQUE), `email`(UNIQUE), `password`, `total_score`, `games_played`, `created_at`
+- **locations** — `id`, `name`, `description`, `px_x`, `px_y`, `image_url`, `difficulty`(TINYINT, 1~5), `area`, `created_at`
+- **game_records** — `id`, `user_id`(FK→users CASCADE), `location_id`(FK→locations RESTRICT), `guess_px_x`, `guess_px_y`, `distance_meters`(DECIMAL(10,2)), `score`, `created_at`
 
-**users** — 用户表
-`id`(PK, AUTO_INCREMENT), `username`(VARCHAR(100), UNIQUE, NOT NULL), `email`(VARCHAR(255), UNIQUE, NOT NULL), `password`(VARCHAR(255), NOT NULL), `total_score`(INT, DEFAULT 0), `games_played`(INT, DEFAULT 0), `created_at`(DATETIME, DEFAULT CURRENT_TIMESTAMP)
+> **坐标基准**: 所有 `px_x`/`px_y` 字段基于 2546×3914 像素地图。种子数据 24 条，坐标范围 x: 891~1980, y: 819~2332。
 
-**locations** — 地点/题目表
-`id`(PK, AUTO_INCREMENT), `name`(VARCHAR(100), NOT NULL), `description`(TEXT), `px_x`(INT, NOT NULL), `px_y`(INT, NOT NULL), `image_url`(VARCHAR(255), NOT NULL), `difficulty`(TINYINT, DEFAULT 3), `area`(VARCHAR(50)), `created_at`(DATETIME, DEFAULT CURRENT_TIMESTAMP)
+## 位置数据
 
-**game_records** — 游戏记录表
-`id`(PK, AUTO_INCREMENT), `user_id`(INT, NOT NULL, FK→users.id ON DELETE CASCADE), `location_id`(INT, NOT NULL, FK→locations.id ON DELETE RESTRICT), `guess_px_x`(INT, NOT NULL), `guess_px_y`(INT, NOT NULL), `distance_meters`(DECIMAL(10,2), NOT NULL), `score`(INT, NOT NULL), `created_at`(DATETIME, DEFAULT CURRENT_TIMESTAMP)
+两份数据文件，内容一致，修改时需保持同步：
 
-> 坐标字段（`px_x`, `px_y`, `guess_px_x`, `guess_px_y`）均为原始图片像素坐标，基准尺寸 7087×10630。非经纬度。
+1. `frontend/public/locations.json` — 前端 fallback，GameView 在后端不可用时直接 fetch 此文件
+2. `backend/scripts/seed_locations.sql` — 数据库种子，导入 MySQL
 
-### 状态管理
+## Vite 开发配置
 
-项目引入了 Pinia，但目前尚未创建 store 文件。Store 文件应放在 `frontend/src/stores/` 目录下。
+`frontend/vite.config.js`：
+- `/api` 请求代理到 `http://localhost:3000`（开发环境跨域方案）
+- `allowedHosts` 含 ngrok 域名（内网穿透测试用）
 
-### 静态资源
+## Nginx 生产部署
 
-- 前端地图图片: `frontend/src/assets/gulou_map.png`（鼓楼校区地图）
-- 后端校园照片: `backend/public/images/`（待添加）
-- 数据文件: `data/` 目录（待添加）
+`nginx.conf` 位于项目根目录，将 80 端口反向代理到 `127.0.0.1:3000`。部署路径：`/etc/nginx/conf.d/njuxun.conf`。
+
+## 当前待完成事项
+
+- Pinia store 注册与创建（`main.js` 中 `createPinia()` + `app.use(pinia)`）
+- Element Plus 注册（如需使用其组件）
+- 用户认证（JWT middleware 尚未实现）
+- 后端其他 API 端点（用户注册/登录、游戏记录保存/查询）

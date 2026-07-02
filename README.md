@@ -2,6 +2,8 @@
 
 2026 南京大学 EL 大赛交互组参赛作品。
 
+**官方网址：** http://njuxun.top
+
 ## 项目简介
 
 **南大图寻** 是一个基于校园地图照片的定位猜测游戏。玩家在游戏中看到一张校园实景照片，需要在地图上点击猜测拍摄位置——猜得越准、得分越高。系统根据实际坐标与猜测坐标的直线距离计算得分。
@@ -90,26 +92,6 @@ njuxun/
 
 > 所有涉及地图坐标的计算都应以原始图片像素（2546×3914）为基准。
 
-## 数据库claude
-
-数据库名为 `njuxun`，包含三张核心表：
-
-| 表名 | 用途 | 核心字段 |
-|------|------|----------|
-| `users` | 用户表 | id, username, email, password, total_score, games_played |
-| `locations` | 地点/题目表 | id, name, px_x, px_y, image_url, difficulty, area |
-| `game_records` | 游戏记录表 | id, user_id, location_id, guess_px_x, guess_px_y, distance_meters, score |
-
-### 初始化数据库
-
-```bash
-# 1. 确保 MySQL 服务已启动
-# 2. 执行初始化脚本
-mysql -u root -p < backend/scripts/init_db.sql
-```
-
-脚本会创建数据库 `njuxun` 和三张表，并建立外键约束（`game_records` → `users`、`game_records` → `locations`）。
-
 ## 快速开始
 
 ### 环境配置
@@ -146,3 +128,47 @@ cd backend && npm run dev
 ### 验证
 
 浏览器打开 `http://localhost:5173` 查看前端页面；访问 `http://localhost:3000/api/health` 检查后端健康状态。
+
+## 当前待办（2026/6/10 upd）
+
+- Pinia store 注册与创建（`main.js` 中 `createPinia()` + `app.use(pinia)`）
+- Element Plus 注册（如需使用其组件）
+- 用户认证（JWT middleware 尚未实现）
+- 后端其他 API 端点（用户注册/登录、游戏记录保存/查询）
+
+## 部署指南
+
+基于 **Ubuntu 20.04/22.04**，需预装 Node.js ≥18、MySQL ≥8.0、PM2、Nginx、Git。
+
+### 首次部署
+
+```bash
+# 1. 克隆项目并配置环境变量
+git clone <your-repo-url> /opt/njuxun && cd /opt/njuxun
+cp .env.example .env            # 编辑填入 MySQL 密码和 JWT 密钥
+
+# 2. 修改 nginx.conf 中的 server_name 为你的域名或 IP
+
+# 3. 一键部署（建库 → 种子数据 → Nginx → 依赖 → 构建 → 启动）
+bash deploy.sh --setup
+
+# 4. 设置开机自启（按提示执行输出的命令）
+pm2 startup
+
+# 5. 验证
+curl http://localhost:3000/api/health
+```
+
+浏览器访问 `http://<你的IP或域名>` 即可。
+
+### 后续更新
+
+```bash
+cd /opt/njuxun && bash deploy.sh    # git pull → 安装依赖 → 构建 → 重启
+```
+
+---
+
+## 许可证
+
+本项目基于 [MIT License](LICENSE) 开源。
