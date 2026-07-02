@@ -24,7 +24,6 @@
         <thead>
           <tr>
             <th>#</th>
-            <th>地点</th>
             <th>距离（米）</th>
             <th>得分</th>
           </tr>
@@ -32,7 +31,6 @@
         <tbody>
           <tr v-for="(r, i) in scoreHistory" :key="i" :class="scoreRowClass(r.score)">
             <td>{{ i + 1 }}</td>
-            <td>{{ r.locationName || '-' }}</td>
             <td>{{ r.distance }}</td>
             <td class="score-cell">{{ r.score }}</td>
           </tr>
