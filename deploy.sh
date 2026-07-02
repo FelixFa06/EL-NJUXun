@@ -23,7 +23,9 @@ cd frontend && npm install && npm run build && cd ..
 
 echo ""
 echo "🚀 重启服务..."
-pm2 restart ecosystem.config.js --cwd backend || pm2 start backend/ecosystem.config.js
+cd backend
+pm2 restart ecosystem.config.js 2>/dev/null || pm2 start ecosystem.config.js
+cd ..
 
 echo ""
 echo "✅ 部署完成！"
